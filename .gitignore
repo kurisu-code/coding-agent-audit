@@ -1,0 +1,17 @@
+# 本地依赖与配置（不含密钥，但属本机环境，不入库）
+node_modules/
+.npmrc
+
+# 分发包：走 GitHub Releases 附件，不进 git
+*.tgz
+
+# 开发期遗留：src/index.ts 与发布的 index.js 脱节（115 行/2 工具 vs 588 行/6 工具），
+# overlay.yml 以绝对路径指向它且不在 files/.tgz 白名单内。
+# 保留在本地供查证，但不纳入发布仓库；index.js 是唯一源码。
+src/
+overlay.yml
+
+# 编辑器 / 系统残留
+.DS_Store
+Thumbs.db
+*.log

@@ -1,0 +1,3 @@
+- insert:
+    - id: coding-agent-audit
+      name: dsh-plugin-coding-agent-audit

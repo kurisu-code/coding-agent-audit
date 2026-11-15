@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>编码代理审计助手 · 使用向导</title>
+<style>
+  :root { --bg: #f7f8fa; --card: #fff; --text: #1f2329; --muted: #646a73; --line: #dee0e3; --accent: #3370ff; --ok: #2ea121; --warn: #d83931; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; padding: 24px 16px 60px; }
+  .wrap { max-width: 820px; margin: 0 auto; }
+  h1 { font-size: 22px; margin-bottom: 6px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+  .card h2 { font-size: 17px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .badge { font-size: 12px; padding: 2px 8px; border-radius: 20px; background: #eef2ff; color: var(--accent); font-weight: 500; }
+  label { display: block; font-size: 14px; font-weight: 500; margin: 14px 0 4px; }
+  .hint { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  input[type="text"], textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 7px; font-size: 14px; font-family: inherit; }
+  textarea { resize: vertical; min-height: 70px; }
+  button { background: var(--accent); color: #fff; border: 0; border-radius: 7px; padding: 10px 18px; font-size: 14px; font-weight: 500; cursor: pointer; margin-top: 16px; }
+  button:hover { opacity: 0.9; }
+  .output { background: #1f2329; color: #e8f0fe; border-radius: 8px; padding: 14px; margin-top: 14px; font-family: "SFMono-Regular", Consolas, monospace; font-size: 13px; white-space: pre-wrap; word-break: break-word; display: none; }
+  .output.show { display: block; }
+  .copy-btn { background: #2ea121; margin-top: 8px; display: none; }
+  .copy-btn.show { display: inline-block; }
+  .footer { color: var(--muted); font-size: 13px; margin-top: 24px; text-align: center; }
+  .ok { color: var(--ok); font-weight: 500; }
+  .warn { color: var(--warn); font-weight: 500; }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; font-size: 14px; font-weight: 500; }
+  .steps { font-size: 14px; color: var(--muted); padding-left: 18px; margin-top: 8px; }
+  .steps li { margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🛡️ 编码代理审计助手</h1>
+  <p class="sub">如果 Cursor / Claude Code / Copilot 触发了安全告警，用这个页面生成“请 DSH 帮我查一下”的指令。不需要懂技术，照着填就行。</p>
+
+  <!-- 场景一 -->
+  <div class="card">
+    <h2>场景一：代理启动了一个我不认识的程序 <span class="badge">最常见</span></h2>
+    <p class="hint">比如告警说“某进程启动了 cmd.exe / powershell.exe”，你想知道是不是代理的正常行为。</p>
+    <label>那个程序的进程 ID（PID）是多少？</label>
+    <p class="hint">在告警详情里找“Process ID”或“PID”。如果找不到，填 <code>0</code> 也可以，让 DSH 先看当前会话的父进程链。</p>
+    <input type="text" id="pid" placeholder="例如：13392">
+    <button onclick="genProcess()">生成指令</button>
+    <div class="output" id="outProcess"></div>
+    <button class="copy-btn" id="copyProcess" onclick="copy('outProcess')">复制上面的指令</button>
+  </div>
+
+  <!-- 场景二 -->
+  <div class="card">
+    <h2>场景二：代理读了敏感文件 <span class="badge">高风险</span></h2>
+    <p class="hint">比如告警说“某进程读取了 .aws/credentials 或 .ssh/id_rsa”，你想知道这是不是代理在做正常开发任务。</p>
+    <label>被读取的文件路径（一行一个）</label>
+    <p class="hint">从告警详情里复制路径。常见敏感路径：<code>C:\Users\你的用户名\.aws\credentials</code>、<code>C:\Users\你的用户名\.ssh\id_rsa</code></p>
+    <textarea id="paths" placeholder="C:\Users\你的用户名\.aws\credentials&#10;D:\my-project\config.json"></textarea>
+    <button onclick="genCredential()">生成指令</button>
+    <div class="output" id="outCredential"></div>
+    <button class="copy-btn" id="copyCredential" onclick="copy('outCredential')">复制上面的指令</button>
+  </div>
+
+  <!-- 场景三 -->
+  <div class="card">
+    <h2>场景三：代理在对外连接 / 开了隧道 <span class="badge">高风险</span></h2>
+    <p class="hint">比如告警说“检测到 ngrok / ssh -R / 对外暴露端口”，你想知道这是不是代理的正常外联。</p>
+    <label>告警里提到的命令行或连接目标（一行一个，没有就留空）</label>
+    <p class="hint">例如：<code>ngrok http 8080</code>、<code>ssh -R 9000:localhost:22 user@host</code></p>
+    <textarea id="commands" placeholder="ngrok http 8080"></textarea>
+    <button onclick="genTunnel()">生成指令</button>
+    <div class="output" id="outTunnel"></div>
+    <button class="copy-btn" id="copyTunnel" onclick="copy('outTunnel')">复制上面的指令</button>
+  </div>
+
+  <!-- 高级 -->
+  <div class="card">
+    <details>
+      <summary>高级：手动调用聚合报告（如果你已经拿到了三份证据）</summary>
+      <p class="hint" style="margin-top:10px">先把三个采集工具的输出各复制一份，然后在这个框里每行放一个 JSON 字符串。</p>
+      <label>三份证据（JSON 字符串，一行一个）</label>
+      <textarea id="evidence" placeholder='{"path_hits":[...]}&#10;{"nodes":[...]}&#10;{"tunnel_indicators":[...]}'></textarea>
+      <button onclick="genAlert()">生成聚合指令</button>
+      <div class="output" id="outAlert"></div>
+      <button class="copy-btn" id="copyAlert" onclick="copy('outAlert')">复制上面的指令</button>
+    </details>
+  </div>
+
+  <p class="footer">生成指令后，复制到 DSH 对话框里发送即可。DSH 会调用工具并把结果整理成你能看懂的报告。</p>
+</div>
+
+<script>
+function esc(s) {
+  return String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+}
+function show(id, text) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.classList.add('show');
+  const btn = document.getElementById('copy' + id.replace('out',''));
+  if (btn) btn.classList.add('show');
+}
+function copy(id) {
+  const text = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(text).then(() => alert('已复制，去 DSH 对话框里粘贴发送即可。'));
+}
+function genProcess() {
+  const pid = document.getElementById('pid').value.trim() || '0';
+  show('outProcess', `请使用 collect_process_tree 工具，pid 填 ${pid}，max_depth 填 5，帮我看看这个进程的父进程链里有没有 Claude Code / Cursor / Copilot。`);
+}
+function genCredential() {
+  const raw = document.getElementById('paths').value.trim();
+  if (!raw) { alert('请至少填一个文件路径。'); return; }
+  const arr = raw.split('\n').map(s => s.trim()).filter(Boolean);
+  const jsonArr = JSON.stringify(arr).replace(/"/g, '\\"');
+  show('outCredential', `请使用 collect_credential_access 工具，paths 填 ${jsonArr}，帮我判断这些路径是否包含敏感凭据，以及访问是否在当前任务范围内。`);
+}
+function genTunnel() {
+  const raw = document.getElementById('commands').value.trim();
+  if (!raw) { show('outTunnel', '请使用 collect_egress_tunnel 工具，检查当前会话是否有对外隧道或异常外联行为。'); return; }
+  const arr = raw.split('\n').map(s => s.trim()).filter(Boolean);
+  const jsonArr = JSON.stringify(arr).replace(/"/g, '\\"');
+  show('outTunnel', `请使用 collect_egress_tunnel 工具，commands 填 ${jsonArr}，帮我判断这些命令是否在建立隧道或对外暴露服务。`);
+}
+function genAlert() {
+  const raw = document.getElementById('evidence').value.trim();
+  if (!raw) { alert('请至少放一份证据 JSON。'); return; }
+  const lines = raw.split('\n').map(s => s.trim()).filter(Boolean);
+  const jsonArr = '[' + lines.map(s => '"' + esc(s) + '"').join(',') + ']';
+  show('outAlert', `请使用 audit_coding_agent_alert 工具，alert_type 填 combined，evidence 填 ${jsonArr}，帮我生成一份可审计的报告。`);
+}
+</script>
+</body>
+</html>
